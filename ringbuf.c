@@ -1,6 +1,10 @@
 #include <stdio.h>
+#include <pthread.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <time.h>
 
 #define SIZE 10
 
@@ -74,34 +78,53 @@ message extractElement(struct ringbuffer *ringbuffer) {
     }
 }
 
-static struct ringbuffer ringbufferimpl;
+void * consumerThread(void * sum) {
+  *((int*)sum) = 42;
+  //while (message != QUIT) {
+    // Wait
+  //}
+  pthread_exit(0);
+}
+
+// From http://stackoverflow.com/a/33412960
+int nsleep(long miliseconds)
+{
+   struct timespec req, rem;
+
+   if(miliseconds > 999) {
+        req.tv_sec = (int)(miliseconds / 1000);                            /* Must be Non-Negative */
+        req.tv_nsec = (miliseconds - ((long)req.tv_sec * 1000)) * 1000000; /* Must be in range of 0 to 999999999 */
+   }
+   else {
+        req.tv_sec = 0;                         /* Must be Non-Negative */
+        req.tv_nsec = miliseconds * 1000000;    /* Must be in range of 0 to 999999999 */
+   }
+   return nanosleep(&req , &rem);
+}
+
+//static struct ringbuffer ringbufferimpl;
 int main(int argc, char *argv[]) {
-    message firstMessage = {1, 1, 1, 1, 1};
-    message secondMessage = {2, 2, 2, 2, 2};
-    message thirdMessage = {3, 3, 3, 3, 3};
-    message fourthMessage = {4, 4, 4, 4, 4};
-    message fifthMessage = {5, 5, 5, 5, 5};
+  pthread_t consumer;	// this is our thread identifier
+  int sum = 0;
+  pthread_create(&consumer, NULL, consumerThread, &sum);
 
-    insertElement(&ringbufferimpl, &firstMessage);
-    printBuffer(&ringbufferimpl);
+  char * filename = "testinput0.txt";
+  FILE *trace_file_pointer = fopen(filename, "r");
+  if (!trace_file_pointer) {
+      fprintf(stderr, "%s: %s\n", filename, strerror(errno));
+      exit(1);
+  }
 
-    insertElement(&ringbufferimpl, &secondMessage);
-    printBuffer(&ringbufferimpl);
-
-    message removeFirst = extractElement(&ringbufferimpl);
-    printRingBufferMessage(&removeFirst);
-
-    insertElement(&ringbufferimpl, &thirdMessage);
-    printBuffer(&ringbufferimpl);
-
-    insertElement(&ringbufferimpl, &fourthMessage);
-    printBuffer(&ringbufferimpl);
-
-    insertElement(&ringbufferimpl, &fifthMessage);
-    printBuffer(&ringbufferimpl);
-
-    message removeSecond = extractElement(&ringbufferimpl);
-    printRingBufferMessage(&removeSecond);
-
-    printf("%s", "Hello ZQ");
+  char line[100];
+  while (fgets(line, 100, trace_file_pointer) != NULL)  {
+    char value[5], consumerSleep[5], producerSleep[5], printCode[5];
+    sscanf(line, "%s %s %s %s", value, consumerSleep, producerSleep, printCode);
+    printf("%s", value);
+    nsleep(1000);
+    fflush(stdout);
+  }
+  fclose(trace_file_pointer);
+  pthread_join(consumer, NULL);
+  printf("%d", sum);
+  return 0;
 }
