@@ -6,7 +6,7 @@
 #include <errno.h>
 #include <time.h>
 
-#define SIZE 30
+#define SIZE 10
 
 typedef struct message {
     int value;
@@ -80,14 +80,6 @@ message extractElement(struct ringbuffer *ringbuffer) {
     }
 }
 
-void * consumerThread(void * sum) {
-  *((int*)sum) = 42;
-  //while (message != QUIT) {
-    // Wait
-  //}
-  pthread_exit(0);
-}
-
 // From http://stackoverflow.com/a/33412960
 int nsleep(long miliseconds)
 {
@@ -103,6 +95,21 @@ int nsleep(long miliseconds)
    }
    return nanosleep(&req , &rem);
 }
+
+void * consumerThread(void * sum) {
+  while (true) {
+    message msg = extractElement(&buffer);
+    if (msg.quit == 1){
+      printf("Final sum is %d\n", *((int*)sum));
+      pthread_exit(0);
+    }
+    nsleep(msg.consumer_sleep);
+    *((int*)sum) += msg.value;
+    if (msg.print_code == 2 || msg.print_code ==3)
+      printf("Consumed %d from input line %d; sum = %d\n", msg.value, msg.line, *((int*)sum));
+  }
+}
+
 
 //static struct ringbuffer ringbufferimpl;
 int main(int argc, char *argv[]) {
