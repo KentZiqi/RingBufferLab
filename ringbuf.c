@@ -6,7 +6,7 @@
 #include <errno.h>
 #include <time.h>
 
-#define SIZE 10
+#define SIZE 30
 
 typedef struct message {
     int value;
@@ -27,8 +27,10 @@ typedef struct ringbuffer {
     int number_of_elements;
 } ringbuffer;
 
+ringbuffer buffer;
+
 void printRingBufferMessage(message *element) {
-    printf("Value is %d, consumer sleep is %d, line num is %d, print code is %d, and quit number is %d\n",
+    printf("v: %d, cs: %d, ln: %d, pc: %d, and q: %d\n",
            element->value, element->consumer_sleep, element->line, element->print_code, element-> quit);
 }
 
@@ -107,22 +109,26 @@ int main(int argc, char *argv[]) {
   pthread_t consumer;	// this is our thread identifier
   int sum = 0;
   pthread_create(&consumer, NULL, consumerThread, &sum);
-
   char * filename = "testinput0.txt";
   FILE *trace_file_pointer = fopen(filename, "r");
   if (!trace_file_pointer) {
       fprintf(stderr, "%s: %s\n", filename, strerror(errno));
       exit(1);
   }
-
   char line[100];
+  int line_number = 0;
+  int value, consumerSleep, producerSleep, printCode;
   while (fgets(line, 100, trace_file_pointer) != NULL)  {
-    char value[5], consumerSleep[5], producerSleep[5], printCode[5];
-    sscanf(line, "%s %s %s %s", value, consumerSleep, producerSleep, printCode);
-    printf("%s", value);
-    nsleep(1000);
-    fflush(stdout);
+    line_number ++;
+    sscanf(line, "%d %d %d %d", &value, &consumerSleep, &producerSleep, &printCode);
+    nsleep(500);
+    message msg = {value, consumerSleep, line_number, printCode, 0};
+    insertElement(&buffer, &msg);
+    if (printCode == 1 || printCode == 3)
+      printf("Produced %d from input line %d \n", value, line_number);
   }
+  message msg = {0, 0, 0, 0, 1};
+  insertElement(&buffer, &msg);
   fclose(trace_file_pointer);
   pthread_join(consumer, NULL);
   printf("%d", sum);
