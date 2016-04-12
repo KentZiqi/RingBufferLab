@@ -30,8 +30,6 @@ typedef struct ringbuffer {
 } ringbuffer;
 
 ringbuffer buffer;
-pthread_mutex_t mutex;
-pthread_cond_t condition;
 
 void printRingBufferMessage(message *element) {
     printf("v: %d, cs: %d, ln: %d, pc: %d, and q: %d\n",
