@@ -7,6 +7,8 @@
 #include <time.h>
 
 #define SIZE 10
+pthread_cond_t space_c, item_c;
+pthread_mutex_t m;
 
 typedef struct message {
     int value;
@@ -28,6 +30,8 @@ typedef struct ringbuffer {
 } ringbuffer;
 
 ringbuffer buffer;
+pthread_mutex_t mutex;
+pthread_cond_t condition;
 
 void printRingBufferMessage(message *element) {
     printf("v: %d, cs: %d, ln: %d, pc: %d, and q: %d\n",
@@ -98,7 +102,13 @@ int nsleep(long miliseconds)
 
 void * consumerThread(void * sum) {
   while (true) {
+    pthread_mutex_lock(&m);
+    while(buffer.number_of_elements == 0){
+      pthread_cond_wait(&item_c, &m);
+    }
     message msg = extractElement(&buffer);
+    pthread_cond_signal(&space_c);
+    pthread_mutex_unlock(&m);
     if (msg.quit == 1){
       printf("Final sum is %d\n", *((int*)sum));
       pthread_exit(0);
@@ -113,10 +123,13 @@ void * consumerThread(void * sum) {
 
 //static struct ringbuffer ringbufferimpl;
 int main(int argc, char *argv[]) {
+  pthread_cond_init (&space_c, NULL) ;
+  pthread_cond_init (&item_c, NULL) ;
+  pthread_mutex_init(&m, NULL);
   pthread_t consumer;	// this is our thread identifier
   int sum = 0;
   pthread_create(&consumer, NULL, consumerThread, &sum);
-  char * filename = "testinput0.txt";
+  char * filename = "testinput4.txt";
   FILE *trace_file_pointer = fopen(filename, "r");
   if (!trace_file_pointer) {
       fprintf(stderr, "%s: %s\n", filename, strerror(errno));
@@ -130,13 +143,20 @@ int main(int argc, char *argv[]) {
     sscanf(line, "%d %d %d %d", &value, &consumerSleep, &producerSleep, &printCode);
     nsleep(500);
     message msg = {value, consumerSleep, line_number, printCode, 0};
+    pthread_mutex_lock(&m);
+    while(buffer.number_of_elements == SIZE){
+      pthread_cond_wait(&space_c, &m);
+    }
     insertElement(&buffer, &msg);
+    pthread_cond_signal(&item_c);
+    pthread_mutex_unlock(&m);
     if (printCode == 1 || printCode == 3)
       printf("Produced %d from input line %d \n", value, line_number);
   }
   message msg = {0, 0, 0, 0, 1};
   insertElement(&buffer, &msg);
   fclose(trace_file_pointer);
+
   pthread_join(consumer, NULL);
   printf("%d", sum);
   return 0;
